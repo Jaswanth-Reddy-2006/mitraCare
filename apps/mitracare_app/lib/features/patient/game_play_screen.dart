@@ -28,6 +28,7 @@ class _GamePlayScreenState extends ConsumerState<GamePlayScreen> {
   bool _isFinished = false;
   int _score = 0;
   String _gameState = "PLAYING"; // "PLAYING", "SUCCESS", "FAILED"
+  int _gameStep = 0; // 0: How to Play, 1: Hear Instructions, 2: Gameplay
 
   // Game 1: Find the Match (Card Matching)
   List<String> _cardSymbols = [];
@@ -390,6 +391,15 @@ class _GamePlayScreenState extends ConsumerState<GamePlayScreen> {
           icon: const Icon(Icons.close, color: DesignSystem.textDark),
           onPressed: () => context.pop(),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.volume_up_outlined, color: DesignSystem.primaryGreen),
+            onPressed: () {
+              final voice = ref.read(voiceServiceProvider);
+              voice.speak("This is ${widget.title}. Follow the instructions to play!");
+            },
+          ),
+        ],
       ),
       body: SafeArea(
         child: _isLoading
@@ -399,12 +409,181 @@ class _GamePlayScreenState extends ConsumerState<GamePlayScreen> {
                 child: Column(
                   children: [
                     Expanded(
-                      child: _isFinished ? _buildResultView(lang) : _buildGamePlayView(lang),
+                      child: _isFinished
+                          ? _buildResultView(lang)
+                          : (_gameStep == 0
+                              ? _buildHowToPlayView(lang, textScale)
+                              : (_gameStep == 1
+                                  ? _buildHearInstructionsView(lang, textScale)
+                                  : _buildGamePlayView(lang))),
                     ),
                   ],
                 ),
               ),
       ),
+    );
+  }
+
+  Widget _buildHowToPlayView(String lang, double textScale) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        const SizedBox(height: 12),
+        Text(
+          "How to Play",
+          style: TextStyle(fontSize: 24 * textScale, fontWeight: FontWeight.bold, color: DesignSystem.textDark),
+        ),
+        const SizedBox(height: 28),
+        Expanded(
+          child: SingleChildScrollView(
+            child: Column(
+              children: [
+                _buildInstructionRow(Icons.remove_red_eye_outlined, Colors.blue.shade600, "Look at the screen carefully.", textScale),
+                const SizedBox(height: 20),
+                _buildInstructionRow(Icons.touch_app_outlined, Colors.orange.shade600, "Tap on the correct item or pattern.", textScale),
+                const SizedBox(height: 20),
+                _buildInstructionRow(Icons.check_circle_outline, Colors.green.shade600, "Each correct move keeps items open & increases score.", textScale),
+                const SizedBox(height: 20),
+                _buildInstructionRow(Icons.lightbulb_outline, Colors.amber.shade700, "Automatic AI hints appear if you get stuck!", textScale),
+                const SizedBox(height: 20),
+                _buildInstructionRow(Icons.emoji_events_outlined, Colors.purple.shade600, "Complete all levels to finish the game!", textScale),
+              ],
+            ),
+          ),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            setState(() {
+              _gameStep = 1;
+            });
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: DesignSystem.primaryGreen,
+            minimumSize: const Size(double.infinity, 56),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            elevation: 2,
+          ),
+          child: Text(
+            "Got it!",
+            style: TextStyle(fontSize: 18 * textScale, fontWeight: FontWeight.bold, color: Colors.white),
+          ),
+        ),
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          onPressed: () {
+            final voice = ref.read(voiceServiceProvider);
+            voice.speak("This is ${widget.title}. Look at the items, tap to answer, and complete all levels!");
+            setState(() {
+              _gameStep = 1;
+            });
+          },
+          icon: const Icon(Icons.volume_up, color: DesignSystem.primaryGreen),
+          label: Text(
+            "Hear Instructions",
+            style: TextStyle(fontSize: 16 * textScale, fontWeight: FontWeight.bold, color: DesignSystem.primaryGreen),
+          ),
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size(double.infinity, 52),
+            side: BorderSide(color: Colors.grey.shade300, width: 1.5),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHearInstructionsView(String lang, double textScale) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const Spacer(),
+        Container(
+          width: 130,
+          height: 130,
+          decoration: BoxDecoration(
+            color: const Color(0xFFE8F5E9),
+            shape: BoxShape.circle,
+            border: Border.all(color: DesignSystem.primaryGreen, width: 3),
+            boxShadow: DesignSystem.softShadow,
+          ),
+          child: const Center(
+            child: Text("👵", style: TextStyle(fontSize: 70)),
+          ),
+        ),
+        const SizedBox(height: 24),
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: Colors.grey.shade200, width: 1.5),
+            boxShadow: DesignSystem.softShadow,
+          ),
+          child: Column(
+            children: [
+              Text(
+                "This is ${widget.title}.",
+                style: TextStyle(fontSize: 18 * textScale, fontWeight: FontWeight.bold, color: DesignSystem.textDark),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                "In this game, tap the items to answer.\nIf you're unsure, our automatic AI assistant will show a hint to guide you!\nEnjoy your game!",
+                style: TextStyle(fontSize: 15 * textScale, color: DesignSystem.textSubtle, height: 1.4),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+        const Spacer(),
+        ElevatedButton(
+          onPressed: () {
+            setState(() {
+              _gameStep = 2;
+            });
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: DesignSystem.primaryGreen,
+            minimumSize: const Size(double.infinity, 56),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            elevation: 2,
+          ),
+          child: Text(
+            "Okay, let's play!",
+            style: TextStyle(fontSize: 18 * textScale, fontWeight: FontWeight.bold, color: Colors.white),
+          ),
+        ),
+        const SizedBox(height: 12),
+      ],
+    );
+  }
+
+  Widget _buildInstructionRow(IconData icon, Color color, String text, double textScale) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.12),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, color: color, size: 24),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(
+              fontSize: 16 * textScale,
+              fontWeight: FontWeight.w600,
+              color: DesignSystem.textDark,
+              height: 1.3,
+            ),
+          ),
+        ),
+      ],
     );
   }
 

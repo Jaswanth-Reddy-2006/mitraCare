@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, List
 from datetime import datetime
 
@@ -39,11 +39,11 @@ class ActivitySessionResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 class ActivityResultCreate(BaseModel):
-    score: int
-    accuracy: float
-    response_time: Optional[int] = None
-    mistakes: int = 0
-    hints_used: int = 0
+    score: int = Field(..., ge=0, le=1000)
+    accuracy: float = Field(..., ge=0.0, le=1.0)
+    response_time: Optional[int] = Field(None, ge=0)
+    mistakes: int = Field(0, ge=0)
+    hints_used: int = Field(0, ge=0)
     metadata_json: Optional[str] = None
 
 class ActivityResultResponse(BaseModel):

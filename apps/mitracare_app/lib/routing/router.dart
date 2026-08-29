@@ -17,6 +17,9 @@ import 'package:mitracare_app/features/patient/help_screen.dart';
 import 'package:mitracare_app/features/patient/recall_memory_screen.dart';
 import 'package:mitracare_app/features/patient/patient_id_screen.dart';
 import 'package:mitracare_app/features/patient/settings_screen.dart';
+import 'package:mitracare_app/features/patient/games/screens/choose_game_screen.dart';
+import 'package:mitracare_app/features/patient/games/screens/cognitive_game_screen.dart';
+import 'package:mitracare_app/features/patient/games/models/cognitive_game_models.dart';
 import 'package:mitracare_app/features/auth/connect_handler_screen.dart';
 import 'package:mitracare_app/features/caregiver/dashboard_screen.dart';
 
@@ -120,6 +123,34 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/patient/activities',
         builder: (context, state) => const ActivitiesScreen(),
+      ),
+      GoRoute(
+        path: '/patient/game/choose',
+        builder: (context, state) => const ChooseGameScreen(),
+      ),
+      GoRoute(
+        path: '/patient/game/find-the-pair',
+        builder: (context, state) {
+          final actId = state.uri.queryParameters['activityId'] ?? 'pair_act_id';
+          final diff = state.uri.queryParameters['difficulty'] ?? 'EASY';
+          return CognitiveGameScreen(
+            activityId: actId,
+            gameMode: GameMode.pair,
+            difficulty: diff,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/patient/game/find-the-triplet',
+        builder: (context, state) {
+          final actId = state.uri.queryParameters['activityId'] ?? 'triplet_act_id';
+          final diff = state.uri.queryParameters['difficulty'] ?? 'EASY';
+          return CognitiveGameScreen(
+            activityId: actId,
+            gameMode: GameMode.triplet,
+            difficulty: diff,
+          );
+        },
       ),
       GoRoute(
         path: '/patient/my-day',

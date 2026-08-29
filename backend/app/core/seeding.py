@@ -117,6 +117,20 @@ def seed_database(db: Session):
             "description": "Remember objects and pictures",
             "activities": [
                 {
+                    "title": "Find the Pair",
+                    "description": "Match two same cards",
+                    "icon": "style",
+                    "difficulty": "EASY",
+                    "estimated_duration": 180
+                },
+                {
+                    "title": "Find the Triplet",
+                    "description": "Match three same cards",
+                    "icon": "grid_on",
+                    "difficulty": "MEDIUM",
+                    "estimated_duration": 300
+                },
+                {
                     "title": "Find the Match",
                     "description": "Match similar pictures",
                     "icon": "grid_view",
