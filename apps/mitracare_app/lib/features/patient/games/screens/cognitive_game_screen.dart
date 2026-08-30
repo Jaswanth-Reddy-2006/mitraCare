@@ -28,6 +28,8 @@ class CognitiveGameScreen extends ConsumerStatefulWidget {
 class _CognitiveGameScreenState extends ConsumerState<CognitiveGameScreen> {
   ScreenStep _currentStep = ScreenStep.howToPlay;
   late CognitiveGameConfig _config;
+  int _lastMatchedCount = 0;
+  int _lastAttemptsCount = 0;
 
   @override
   void initState() {
@@ -39,10 +41,39 @@ class _CognitiveGameScreenState extends ConsumerState<CognitiveGameScreen> {
     // Initialize session asynchronously
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(cognitiveGameProvider(_config).notifier).startSession(widget.activityId);
+      _speakCurrentStep();
     });
   }
 
+  void _speakCurrentStep() {
+    final voice = ref.read(voiceServiceProvider);
+    final lang = ref.read(languageProvider);
+    final isPair = widget.gameMode == GameMode.pair;
+
+    if (_currentStep == ScreenStep.howToPlay) {
+      voice.speak(
+        isPair
+            ? "Look at the cards carefully. Tap two cards to find a matching pair."
+            : "Look at the cards carefully. Tap three cards. All three cards must be the same.",
+        langCode: lang,
+      );
+    } else if (_currentStep == ScreenStep.hearInstructions) {
+      voice.speak(
+        isPair
+            ? "This is Match the Pair game. Look at the cards carefully. Tap two cards to find a matching pair."
+            : "This is Match the Triplet game. Look at the cards carefully. Tap three cards. All three cards must be the same.",
+        langCode: lang,
+      );
+    } else if (_currentStep == ScreenStep.gameCompleted) {
+      voice.speak(
+        "Excellent! You completed the game.",
+        langCode: lang,
+      );
+    }
+  }
+
   void _onBackTap() {
+    ref.read(voiceServiceProvider).stop();
     if (_currentStep == ScreenStep.gamePlay) {
       ref.read(cognitiveGameProvider(_config).notifier).pauseGame();
       showDialog(
@@ -85,24 +116,42 @@ class _CognitiveGameScreenState extends ConsumerState<CognitiveGameScreen> {
   Widget build(BuildContext context) {
     final gameState = ref.watch(cognitiveGameProvider(_config));
     final controller = ref.read(cognitiveGameProvider(_config).notifier);
+    final voice = ref.watch(voiceServiceProvider);
     final textScale = MediaQuery.of(context).textScaleFactor;
     final lang = ref.watch(languageProvider);
 
-    final title = widget.gameMode == GameMode.pair ? "Find the Pair" : "Find the Triplet";
+    final title = widget.gameMode == GameMode.pair ? "Match the Pair" : "Match the Triplet";
 
-    // Trigger step transition if game completes automatically
-    if (gameState.status == GameStatus.completed && _currentStep == ScreenStep.gamePlay) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        setState(() {
-          _currentStep = ScreenStep.gameCompleted;
-        });
-      });
-    }
+    // Handle state feedback audio (matches, mismatches, completion)
+    ref.listen<CognitiveGameState>(cognitiveGameProvider(_config), (previous, next) {
+      if (previous != null) {
+        final isPair = widget.gameMode == GameMode.pair;
+        // Match found
+        if (next.matchedGroups > previous.matchedGroups) {
+          voice.speak(
+            isPair ? "Great! You found a matching pair." : "Great! You found a triplet.",
+            langCode: lang,
+          );
+        }
+        // Mismatch occurred
+        else if (next.attempts > previous.attempts && next.matchedGroups == previous.matchedGroups) {
+          voice.speak("These cards do not match. Try again.", langCode: lang);
+        }
+
+        // Completion transition
+        if (next.status == GameStatus.completed && _currentStep == ScreenStep.gamePlay) {
+          setState(() {
+            _currentStep = ScreenStep.gameCompleted;
+          });
+          _speakCurrentStep();
+        }
+      }
+    });
 
     return Scaffold(
       backgroundColor: const Color(0xFFF9FAFC),
       appBar: _currentStep == ScreenStep.gamePlay
-          ? _buildGamePlayAppBar(gameState, textScale)
+          ? _buildGamePlayAppBar(gameState, textScale, voice)
           : AppBar(
               title: Text(
                 title,
@@ -116,15 +165,11 @@ class _CognitiveGameScreenState extends ConsumerState<CognitiveGameScreen> {
               ),
               actions: [
                 IconButton(
-                  icon: const Icon(Icons.volume_up_outlined, color: DesignSystem.primaryGreen),
-                  onPressed: () {
-                    final voice = ref.read(voiceServiceProvider);
-                    voice.speak(
-                      widget.gameMode == GameMode.pair
-                          ? "Find the Pair. Match two same cards."
-                          : "Find the Triplet. Match three same cards.",
-                    );
-                  },
+                  icon: Icon(
+                    voice.isSpeaking ? Icons.volume_up : Icons.volume_up_outlined,
+                    color: DesignSystem.primaryGreen,
+                  ),
+                  onPressed: _speakCurrentStep,
                 ),
               ],
             ),
@@ -137,7 +182,7 @@ class _CognitiveGameScreenState extends ConsumerState<CognitiveGameScreen> {
     );
   }
 
-  PreferredSizeWidget _buildGamePlayAppBar(CognitiveGameState state, double textScale) {
+  PreferredSizeWidget _buildGamePlayAppBar(CognitiveGameState state, double textScale, VoiceService voice) {
     final isPair = widget.gameMode == GameMode.pair;
     final targetLabel = isPair ? "Pairs" : "Triplets";
     final countStr = "${state.matchedGroups} / ${_config.totalGroups}";
@@ -162,6 +207,17 @@ class _CognitiveGameScreenState extends ConsumerState<CognitiveGameScreen> {
         ],
       ),
       actions: [
+        IconButton(
+          icon: Icon(
+            voice.isSpeaking ? Icons.volume_up : Icons.volume_up_outlined,
+            color: DesignSystem.primaryGreen,
+          ),
+          onPressed: () {
+            voice.speak(
+              isPair ? "Find all pairs. Tap two cards to match." : "Find all triplets. Tap three cards to match.",
+            );
+          },
+        ),
         Padding(
           padding: const EdgeInsets.only(right: 16.0),
           child: Column(
@@ -241,6 +297,7 @@ class _CognitiveGameScreenState extends ConsumerState<CognitiveGameScreen> {
               setState(() {
                 _currentStep = ScreenStep.hearInstructions;
               });
+              _speakCurrentStep();
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: DesignSystem.primaryGreen,
@@ -256,15 +313,10 @@ class _CognitiveGameScreenState extends ConsumerState<CognitiveGameScreen> {
           const SizedBox(height: 12),
           OutlinedButton.icon(
             onPressed: () {
-              final voice = ref.read(voiceServiceProvider);
-              voice.speak(
-                isPair
-                    ? "Look at the cards. Tap two cards to flip them. If they match, they stay open. Find all pairs!"
-                    : "Look at the cards. Tap three cards to flip them. If all three match, they stay open. Find all triplets!",
-              );
               setState(() {
                 _currentStep = ScreenStep.hearInstructions;
               });
+              _speakCurrentStep();
             },
             icon: const Icon(Icons.volume_up, color: DesignSystem.primaryGreen),
             label: Text(
@@ -314,7 +366,7 @@ class _CognitiveGameScreenState extends ConsumerState<CognitiveGameScreen> {
   // --- Step 2: Hear Instructions Screen ---
   Widget _buildHearInstructionsView(CognitiveGameNotifier controller, double textScale, String lang) {
     final isPair = widget.gameMode == GameMode.pair;
-    final gameTitle = isPair ? "Find the Pair" : "Find the Triplet";
+    final gameTitle = isPair ? "Match the Pair" : "Match the Triplet";
     final countWord = isPair ? "two" : "three";
 
     return Padding(
@@ -376,6 +428,7 @@ class _CognitiveGameScreenState extends ConsumerState<CognitiveGameScreen> {
 
           ElevatedButton(
             onPressed: () {
+              ref.read(voiceServiceProvider).stop();
               setState(() {
                 _currentStep = ScreenStep.gamePlay;
               });
@@ -406,7 +459,7 @@ class _CognitiveGameScreenState extends ConsumerState<CognitiveGameScreen> {
     String lang,
   ) {
     final isPair = widget.gameMode == GameMode.pair;
-    final crossAxisCount = isPair ? 3 : 3;
+    final crossAxisCount = 3;
 
     return Column(
       children: [
@@ -504,6 +557,8 @@ class _CognitiveGameScreenState extends ConsumerState<CognitiveGameScreen> {
               ElevatedButton(
                 onPressed: () {
                   controller.showHint();
+                  final voice = ref.read(voiceServiceProvider);
+                  voice.speak("Look at these highlighted cards. They are the same.", langCode: lang);
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: DesignSystem.primaryGreen,
@@ -683,6 +738,7 @@ class _CognitiveGameScreenState extends ConsumerState<CognitiveGameScreen> {
 
           ElevatedButton(
             onPressed: () {
+              ref.read(voiceServiceProvider).stop();
               controller.restartGame();
               setState(() {
                 _currentStep = ScreenStep.gamePlay;
@@ -703,6 +759,7 @@ class _CognitiveGameScreenState extends ConsumerState<CognitiveGameScreen> {
           const SizedBox(height: 12),
           OutlinedButton(
             onPressed: () {
+              ref.read(voiceServiceProvider).stop();
               context.pop();
             },
             style: OutlinedButton.styleFrom(

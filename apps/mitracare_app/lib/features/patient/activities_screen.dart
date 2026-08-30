@@ -5,27 +5,49 @@ import '../../core/theme/design_system.dart';
 import 'patient_providers.dart';
 import 'package:mitracare_app/widgets/patient_bottom_nav_bar.dart';
 import 'package:mitracare_app/services/localization_service.dart';
-import 'package:mitracare_app/features/patient/game_play_screen.dart';
 import 'package:mitracare_app/features/patient/games/screens/cognitive_game_screen.dart';
 import 'package:mitracare_app/features/patient/games/models/cognitive_game_models.dart';
 
-class ActivitiesScreen extends ConsumerWidget {
+class ActivitiesScreen extends ConsumerStatefulWidget {
   const ActivitiesScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ActivitiesScreen> createState() => _ActivitiesScreenState();
+}
+
+class _ActivitiesScreenState extends ConsumerState<ActivitiesScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _speakGameSelection();
+    });
+  }
+
+  void _speakGameSelection() {
+    final voice = ref.read(voiceServiceProvider);
+    final lang = ref.read(languageProvider);
+    voice.speak(
+      "Choose a game. You can play Match the Pair or Match the Triplet.",
+      langCode: lang,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final activitiesAsync = ref.watch(activitiesProvider);
     final textScale = MediaQuery.of(context).textScaleFactor;
     final lang = ref.watch(languageProvider);
+    final voice = ref.watch(voiceServiceProvider);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FD),
       body: SafeArea(
         child: Column(
           children: [
-            // Top Bar with Back Arrow and Brain Mascot Illustration
+            // Top Header Bar
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 20, 8),
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
               child: Stack(
                 alignment: Alignment.topCenter,
                 children: [
@@ -33,7 +55,10 @@ class ActivitiesScreen extends ConsumerWidget {
                   Align(
                     alignment: Alignment.centerLeft,
                     child: GestureDetector(
-                      onTap: () => context.pop(),
+                      onTap: () {
+                        voice.stop();
+                        context.pop();
+                      },
                       child: Container(
                         width: 44,
                         height: 44,
@@ -53,7 +78,39 @@ class ActivitiesScreen extends ConsumerWidget {
                     ),
                   ),
 
-                  // Title & Brain mascot row
+                  // Speaker Voice Replay Button top right
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: GestureDetector(
+                      onTap: _speakGameSelection,
+                      child: Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: voice.isSpeaking ? const Color(0xFFDCFCE7) : Colors.white,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: voice.isSpeaking ? DesignSystem.primaryGreen : Colors.transparent,
+                            width: 2,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.06),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Icon(
+                          voice.isSpeaking ? Icons.volume_up : Icons.volume_up_outlined,
+                          color: DesignSystem.primaryGreen,
+                          size: 22,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // Title & Brain Mascot
                   Padding(
                     padding: const EdgeInsets.only(top: 8.0),
                     child: Column(
@@ -70,7 +127,6 @@ class ActivitiesScreen extends ConsumerWidget {
                               ),
                             ),
                             const SizedBox(width: 10),
-                            // Brain holding puzzle piece emoji character
                             Container(
                               padding: const EdgeInsets.all(6),
                               decoration: const BoxDecoration(
@@ -103,7 +159,7 @@ class ActivitiesScreen extends ConsumerWidget {
 
             const SizedBox(height: 12),
 
-            // Sparkle Let's do something great today! Banner
+            // Let's do something great today! Banner
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20.0),
               child: Container(
@@ -132,39 +188,42 @@ class ActivitiesScreen extends ConsumerWidget {
               ),
             ),
 
-            const SizedBox(height: 14),
+            const SizedBox(height: 16),
 
-            // Activities List View
+            // ONLY TWO GAMES LISTED
             Expanded(
-              child: activitiesAsync.when(
-                loading: () => const Center(
-                  child: CircularProgressIndicator(color: DesignSystem.primaryGreen),
-                ),
-                error: (err, stack) => _buildFallbackList(context, textScale, lang),
-                data: (activities) {
-                  if (activities.isEmpty) {
-                    return _buildFallbackList(context, textScale, lang);
-                  }
+              child: ListView(
+                padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 4.0),
+                physics: const BouncingScrollPhysics(),
+                children: [
+                  // Game 1: Match the Pair
+                  _buildGameEntryCard(
+                    context: context,
+                    title: "Match the Pair",
+                    subtitle: "Match two same pictures",
+                    iconBadge: "🎴",
+                    bgColor: const Color(0xFFE0F2FE),
+                    buttonColor: const Color(0xFF0284C7),
+                    activityId: _findActivityId(activitiesAsync, "Pair"),
+                    mode: GameMode.pair,
+                    textScale: textScale,
+                  ),
 
-                  return ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 4.0),
-                    physics: const BouncingScrollPhysics(),
-                    itemCount: activities.length,
-                    itemBuilder: (context, index) {
-                      final act = activities[index];
-                      return _buildCustomActivityCard(
-                        context: context,
-                        title: act['title'] ?? 'Activity',
-                        subtitle: act['description'] ?? '',
-                        difficulty: act['difficulty'] ?? 'MEDIUM',
-                        activityId: act['id'],
-                        index: index,
-                        textScale: textScale,
-                        lang: lang,
-                      );
-                    },
-                  );
-                },
+                  const SizedBox(height: 16),
+
+                  // Game 2: Match the Triplet
+                  _buildGameEntryCard(
+                    context: context,
+                    title: "Match the Triplet",
+                    subtitle: "Match three same pictures",
+                    iconBadge: "🃏",
+                    bgColor: const Color(0xFFDCFCE7),
+                    buttonColor: const Color(0xFF16A34A),
+                    activityId: _findActivityId(activitiesAsync, "Triplet"),
+                    mode: GameMode.triplet,
+                    textScale: textScale,
+                  ),
+                ],
               ),
             ),
           ],
@@ -174,98 +233,40 @@ class ActivitiesScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildFallbackList(BuildContext context, double textScale, String lang) {
-    // Default 6 activity cards matching media_1788023955213.png
-    final defaultGames = [
-      {"id": "act_match", "title": "Find the Match", "sub": "Match two similar pictures", "difficulty": "EASY"},
-      {"id": "act_remember", "title": "Remember Pictures", "sub": "Look, remember and recall", "difficulty": "MEDIUM"},
-      {"id": "act_spot", "title": "Spot the Difference", "sub": "Find what's different", "difficulty": "HARD"},
-      {"id": "act_sort", "title": "Sort and Arrange", "sub": "Arrange items in the right order", "difficulty": "EASY"},
-      {"id": "act_name", "title": "Name That Object", "sub": "Recall names of common objects", "difficulty": "EASY"},
-      {"id": "act_recall", "title": "Recall Daily Events", "sub": "Remember what happened today", "difficulty": "EASY"},
-    ];
-
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 4.0),
-      physics: const BouncingScrollPhysics(),
-      itemCount: defaultGames.length,
-      itemBuilder: (context, index) {
-        final item = defaultGames[index];
-        return _buildCustomActivityCard(
-          context: context,
-          title: item['title']!,
-          subtitle: item['sub']!,
-          difficulty: item['difficulty']!,
-          activityId: item['id']!,
-          index: index,
-          textScale: textScale,
-          lang: lang,
+  String _findActivityId(AsyncValue<List<dynamic>> activitiesAsync, String key) {
+    return activitiesAsync.maybeWhen(
+      data: (list) {
+        final match = list.firstWhere(
+          (act) => (act['title'] as String).toLowerCase().contains(key.toLowerCase()),
+          orElse: () => null,
         );
+        return match != null ? match['id'] : 'act_$key';
       },
+      orElse: () => 'act_$key',
     );
   }
 
-  Widget _buildCustomActivityCard({
+  Widget _buildGameEntryCard({
     required BuildContext context,
     required String title,
     required String subtitle,
-    required String difficulty,
+    required String iconBadge,
+    required Color bgColor,
+    required Color buttonColor,
     required String activityId,
-    required int index,
+    required GameMode mode,
     required double textScale,
-    required String lang,
   }) {
-    // Theme colors and icons matching reference design media_1788023955213.png
-    final List<Map<String, dynamic>> themeConfigs = [
-      {
-        "icon": "🎴",
-        "bgColor": const Color(0xFFE0F2FE),
-        "buttonColor": const Color(0xFF0284C7),
-      },
-      {
-        "icon": "🖼️",
-        "bgColor": const Color(0xFFDCFCE7),
-        "buttonColor": const Color(0xFF16A34A),
-      },
-      {
-        "icon": "🔍",
-        "bgColor": const Color(0xFFFEF3C7),
-        "buttonColor": const Color(0xFFD97706),
-      },
-      {
-        "icon": "🧊",
-        "bgColor": const Color(0xFFF3E8FF),
-        "buttonColor": const Color(0xFF9333EA),
-      },
-      {
-        "icon": "🎮",
-        "bgColor": const Color(0xFFFCE7F3),
-        "buttonColor": const Color(0xFFDB2777),
-      },
-      {
-        "icon": "📅",
-        "bgColor": const Color(0xFFCCFBF1),
-        "buttonColor": const Color(0xFF0D9488),
-      },
-    ];
-
-    final theme = themeConfigs[index % themeConfigs.length];
-
-    final String iconEmoji = theme["icon"];
-    final Color bgColor = theme["bgColor"];
-    final Color buttonColor = theme["buttonColor"];
-
     return Container(
-      margin: const EdgeInsets.only(bottom: 14.0),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(22),
         border: Border.all(color: const Color(0xFFF1F5F9), width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -274,62 +275,37 @@ class ActivitiesScreen extends ConsumerWidget {
         child: InkWell(
           borderRadius: BorderRadius.circular(22),
           onTap: () {
-            final lowerTitle = title.toLowerCase();
-            if (lowerTitle.contains('triplet')) {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => CognitiveGameScreen(
-                    activityId: activityId,
-                    gameMode: GameMode.triplet,
-                    difficulty: difficulty,
-                  ),
+            ref.read(voiceServiceProvider).stop();
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => CognitiveGameScreen(
+                  activityId: activityId,
+                  gameMode: mode,
                 ),
-              );
-            } else if (lowerTitle.contains('match') || lowerTitle.contains('pair')) {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => CognitiveGameScreen(
-                    activityId: activityId,
-                    gameMode: GameMode.pair,
-                    difficulty: difficulty,
-                  ),
-                ),
-              );
-            } else {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => GamePlayScreen(
-                    activityId: activityId,
-                    title: title,
-                    difficulty: difficulty,
-                  ),
-                ),
-              );
-            }
+              ),
+            );
           },
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
+            padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 20.0),
             child: Row(
               children: [
-                // Left Colored Icon Rectangle Box
+                // Left Icon Box
                 Container(
-                  width: 58,
-                  height: 58,
+                  width: 62,
+                  height: 62,
                   decoration: BoxDecoration(
                     color: bgColor,
-                    borderRadius: BorderRadius.circular(18),
+                    borderRadius: BorderRadius.circular(20),
                   ),
                   child: Center(
-                    child: Text(iconEmoji, style: const TextStyle(fontSize: 28)),
+                    child: Text(iconBadge, style: const TextStyle(fontSize: 32)),
                   ),
                 ),
 
-                const SizedBox(width: 16),
+                const SizedBox(width: 18),
 
-                // Title and Subtitle Text Column
+                // Text
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -337,20 +313,17 @@ class ActivitiesScreen extends ConsumerWidget {
                       Text(
                         title,
                         style: TextStyle(
-                          fontSize: 17 * textScale,
+                          fontSize: 19 * textScale,
                           fontWeight: FontWeight.bold,
                           color: const Color(0xFF0F172A),
                         ),
                       ),
-                      const SizedBox(height: 3),
+                      const SizedBox(height: 4),
                       Text(
                         subtitle,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontSize: 13 * textScale,
+                          fontSize: 14 * textScale,
                           color: const Color(0xFF64748B),
-                          height: 1.2,
                         ),
                       ),
                     ],
@@ -359,10 +332,10 @@ class ActivitiesScreen extends ConsumerWidget {
 
                 const SizedBox(width: 12),
 
-                // Trailing Solid Colored Circular Chevron Button
+                // Trailing Action Button
                 Container(
-                  width: 36,
-                  height: 36,
+                  width: 40,
+                  height: 40,
                   decoration: BoxDecoration(
                     color: buttonColor,
                     shape: BoxShape.circle,
@@ -370,7 +343,7 @@ class ActivitiesScreen extends ConsumerWidget {
                   child: const Icon(
                     Icons.chevron_right,
                     color: Colors.white,
-                    size: 22,
+                    size: 24,
                   ),
                 ),
               ],

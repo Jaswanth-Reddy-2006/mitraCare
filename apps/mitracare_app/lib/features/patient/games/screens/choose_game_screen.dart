@@ -3,17 +3,39 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mitracare_app/core/theme/design_system.dart';
 import 'package:mitracare_app/features/patient/patient_providers.dart';
-import 'package:mitracare_app/services/localization_service.dart';
 import '../models/cognitive_game_models.dart';
 import 'cognitive_game_screen.dart';
 
-class ChooseGameScreen extends ConsumerWidget {
+class ChooseGameScreen extends ConsumerStatefulWidget {
   const ChooseGameScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ChooseGameScreen> createState() => _ChooseGameScreenState();
+}
+
+class _ChooseGameScreenState extends ConsumerState<ChooseGameScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _speakGameSelection();
+    });
+  }
+
+  void _speakGameSelection() {
+    final voice = ref.read(voiceServiceProvider);
+    final lang = ref.read(languageProvider);
+    voice.speak(
+      "Choose a game. You can play Match the Pair or Match the Triplet.",
+      langCode: lang,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final textScale = MediaQuery.of(context).textScaleFactor;
     final activitiesAsync = ref.watch(activitiesProvider);
+    final voice = ref.watch(voiceServiceProvider);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF9FAFC),
@@ -22,15 +44,18 @@ class ChooseGameScreen extends ConsumerWidget {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: DesignSystem.textDark),
-          onPressed: () => context.pop(),
+          onPressed: () {
+            voice.stop();
+            context.pop();
+          },
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.volume_up_outlined, color: DesignSystem.primaryGreen),
-            onPressed: () {
-              final voice = ref.read(voiceServiceProvider);
-              voice.speak("Choose a game. Find the Pair or Find the Triplet.");
-            },
+            icon: Icon(
+              voice.isSpeaking ? Icons.volume_up : Icons.volume_up_outlined,
+              color: DesignSystem.primaryGreen,
+            ),
+            onPressed: _speakGameSelection,
           ),
         ],
       ),
@@ -78,17 +103,18 @@ class ChooseGameScreen extends ConsumerWidget {
 
                     const SizedBox(height: 32),
 
-                    // Game Card 1: Find the Pair
+                    // Game Card 1: Match the Pair
                     _buildGameCard(
                       context,
-                      title: "Find the Pair",
-                      subtitle: "Match two same cards",
+                      title: "Match the Pair",
+                      subtitle: "Match two same pictures",
                       iconBadge: "🎴",
                       bgColor: const Color(0xFFF3E5F5),
                       borderColor: const Color(0xFFE1BEE7),
                       iconColor: const Color(0xFF8E24AA),
                       onTap: () {
-                        final pairActId = _findActivityId(activitiesAsync, "Find the Pair");
+                        voice.stop();
+                        final pairActId = _findActivityId(activitiesAsync, "Pair");
                         Navigator.push(
                           context,
                           MaterialPageRoute(
@@ -102,19 +128,20 @@ class ChooseGameScreen extends ConsumerWidget {
                       textScale: textScale,
                     ),
 
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 20),
 
-                    // Game Card 2: Find the Triplet
+                    // Game Card 2: Match the Triplet
                     _buildGameCard(
                       context,
-                      title: "Find the Triplet",
-                      subtitle: "Match three same cards",
-                      iconBadge: "🎴",
+                      title: "Match the Triplet",
+                      subtitle: "Match three same pictures",
+                      iconBadge: "🃏",
                       bgColor: const Color(0xFFE8F5E9),
                       borderColor: const Color(0xFFA5D6A7),
                       iconColor: const Color(0xFF2E7D32),
                       onTap: () {
-                        final tripletActId = _findActivityId(activitiesAsync, "Find the Triplet");
+                        voice.stop();
+                        final tripletActId = _findActivityId(activitiesAsync, "Triplet");
                         Navigator.push(
                           context,
                           MaterialPageRoute(
@@ -127,31 +154,12 @@ class ChooseGameScreen extends ConsumerWidget {
                       },
                       textScale: textScale,
                     ),
-
-                    const SizedBox(height: 16),
-
-                    // Game Card 3: Picture Puzzle (Placeholder/Future Game)
-                    _buildGameCard(
-                      context,
-                      title: "Picture Puzzle",
-                      subtitle: "Complete the picture",
-                      iconBadge: "🧩",
-                      bgColor: const Color(0xFFFFF8E1),
-                      borderColor: const Color(0xFFFFE082),
-                      iconColor: const Color(0xFFF57F17),
-                      onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text("Picture Puzzle coming soon! Try Find the Pair or Find the Triplet.")),
-                        );
-                      },
-                      textScale: textScale,
-                    ),
                   ],
                 ),
               ),
             ),
 
-            // Bottom hill/flowers decorative footer bar
+            // Bottom decorative footer bar
             Container(
               height: 60,
               width: double.infinity,
@@ -182,9 +190,9 @@ class ChooseGameScreen extends ConsumerWidget {
           (act) => (act['title'] as String).toLowerCase().contains(titleMatch.toLowerCase()),
           orElse: () => null,
         );
-        return match != null ? match['id'] : 'default_act_id';
+        return match != null ? match['id'] : 'act_$titleMatch';
       },
-      orElse: () => 'default_act_id',
+      orElse: () => 'act_$titleMatch',
     );
   }
 
@@ -212,19 +220,19 @@ class ChooseGameScreen extends ConsumerWidget {
           borderRadius: BorderRadius.circular(20),
           onTap: onTap,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
             child: Row(
               children: [
                 Container(
-                  width: 52,
-                  height: 52,
+                  width: 56,
+                  height: 56,
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: borderColor),
                   ),
                   child: Center(
-                    child: Text(iconBadge, style: const TextStyle(fontSize: 28)),
+                    child: Text(iconBadge, style: const TextStyle(fontSize: 30)),
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -235,12 +243,12 @@ class ChooseGameScreen extends ConsumerWidget {
                       Text(
                         title,
                         style: TextStyle(
-                          fontSize: 18 * textScale,
+                          fontSize: 19 * textScale,
                           fontWeight: FontWeight.bold,
                           color: DesignSystem.textDark,
                         ),
                       ),
-                      const SizedBox(height: 2),
+                      const SizedBox(height: 4),
                       Text(
                         subtitle,
                         style: TextStyle(
