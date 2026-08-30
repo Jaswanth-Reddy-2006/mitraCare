@@ -10,7 +10,7 @@ class Settings:
     # Database
     DATABASE_URL: str = os.getenv(
         "DATABASE_URL", 
-        "postgresql://mitracare_admin:mitracare_secure_pass@localhost:5432/mitracare_db"
+        "postgresql://neondb_owner:npg_NZa0TswQFe3R@ep-dark-water-azf9uvu1-pooler.c-3.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
     )
     
     # Security
